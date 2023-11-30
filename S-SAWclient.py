@@ -1,64 +1,43 @@
+#import modules 
 import socket
-import random
 import time
 
-def client():
-    c_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    c_socket.settimeout(2)
-    file_path = 'COSC635_P2_DataSent.txt'
-    data_size = 500
-    seq_no = 0
+def server():
+  # create udp socket 
+   s_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+   s_socket.bind(('127.0.0.1', 20001))
 
-    loss_percentage=int(input("Enter the percentage of lost packets [0-99]: "))
-    start_time = time.time()
-    packets_sent = 0
-    packets_lost = 0 
+   print (f"Server listening...")
 
-    with open(file_path, 'rb') as file:
-        while True:
-            random.seed(time.time())
-            random_no = random.randint(0,99)
-            if random_no < loss_percentage:
-                print(f"Simulating packet loss for segment {seq_no}")
-                packets_lost +=1
-                time.sleep(1)
-                continue
+  #initialize sequence number and show that entire file receieved is false 
+   seq_no = 0
+   file_received = False
 
-            data_segment = file.read(data_size)
-            if not data_segment:
-                
-                break
+  # while it is false: take data from client, decode it, 
+   while not file_received: 
+    data, c_addre = s_socket.recvfrom(1024) #sizr of data allowed to come in 
+   
+
+    #decdoe it, get the sequence number and data seperate
+    full_data = data.decode()
+    data_rcv = full_data.split(":")
+    seq_no_recv = data_rcv[0]
+    message=data_rcv[1]
+
+    # print that the data has been receieved 
+    print(f"Received data from {c_addre}: \n Sequence number: {seq_no_recv}\n Data: {message}\n")
+       
+  # send ack back to client 
+    ack_msg = f"ACK {seq_no_recv}.encode()"    
+    s_socket.sendto(ack_msg.encode(), c_addre)          
+        
+  # write info to second txt 
+    with open('COSC635_P2_DataReceived.txt', 'a') as file:
+      file.write(f"Segment Sequence Number {seq_no_recv} : \n{message}\n")
+
+    seq_no += 1
+
     
-            c_socket.sendto(f"{seq_no} :".encode() + data_segment, ('127.0.0.1', 20001))
-            packets_sent += 1
-
-            while True:
-                    try:
-                        ack_msg, _ = c_socket.recvfrom(1024)
-                        ack_str = ack_msg.decode()
-                        if ack_str.startswith("ACK"):
-                            ack_number = int(ack_str.split()[1])
-                            if ack_number == seq_no:
-                                print(f"Acknowledgement received for Segment {seq_no}")
-                                seq_no += 1
-                                break 
-                    except socket.timeout:
-                        print(f"Timeout waiting for acknowledgment. Resending Segment {seq_no}")
-                        c_socket.sendto(f"{seq_no} :".encode() + data_segment, ('127.0.0.1', 20001))
-
-    print(f"File sent to server: {file_path}")
-
-    c_socket.close()
-
-    end_time = time.time()
-    transmission_time = end_time - start_time
-
-    print("\nTransmission Stats:")
-    print(f"Packets sent: {packets_sent}")
-    print(f"Packets lost: {packets_lost}")
-    print(f"Transmission time: {transmission_time:.2f} seconds")
-   
-
+    
 if __name__ == "__main__":
-   
-    client()
+   server()
